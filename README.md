@@ -1,4 +1,4 @@
-# honzuki
+﻿# honzuki
 
 Short program that load every books from your Aladin cart, and then search for that books in Aladin used-book store.
 
@@ -8,4 +8,10 @@ Short program that load every books from your Aladin cart, and then search for t
 * Python 3.6
 * requests library
 * BeautifulSoup library
-* ~~Selenium library~~
+* Selenium library
+* chromedriver.exe in the same location
+
+## TODO
+* 보관함에 있는 책도 포함
+* 온라인 중고 검색
+* 성능 개선, 병렬화
