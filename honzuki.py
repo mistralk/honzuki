@@ -1,20 +1,21 @@
 # honzuki.py
-import requests
-import re
+import time
 import concurrent.futures
-from selenium import webdriver
+import requests
+from seleniumrequests import Chrome
+from selenium.webdriver.common.keys import Keys
 from bs4 import BeautifulSoup as bs
 
-def search_process(book, session):
+def search_thread(book, webdriver):
     # get ISBN
-    book_page = session.get(book['href'])
+    book_page = webdriver.request('GET', book.get_attribute('href'))
     soup = bs(book_page.text, 'html.parser')
 
     info = soup.find("meta", attrs={"property":"books:isbn"})
     isbn = info['content']
 
     # search in the used store
-    used_store = session.get('http://www.aladin.co.kr/search/wsearchresult.aspx?SearchTarget=UsedStore&SearchWord=' + isbn)
+    used_store = webdriver.request('GET', 'http://www.aladin.co.kr/search/wsearchresult.aspx?SearchTarget=UsedStore&SearchWord=' + isbn)
     soup = bs(used_store.text, 'html.parser')
             
     store_list = soup.select('a[class="usedshop_off_text3"]')
@@ -25,44 +26,47 @@ def search_process(book, session):
             result += ' ' + i.text
         print(result)
 
-def main():
-    LOGIN_INFO = {
-    'Email': '',
-    'Password': '',
-    'Action': '1',
-    'ReturnUrl': '',
-    'ReturnUrl_pop': '',
-    'snsUserId': '0',
-    'snsType': '0',
-    'sysAppId': '1'
-    }
+def main():    
+    email = input('email> ')
+    password = input('password> ')
+
+    webdriver = Chrome()
+
+    # log-in
+    webdriver.get('https://www.aladin.co.kr/login/wlogin.aspx')
     
-    LOGIN_INFO['Email'] = input('email> ')
-    LOGIN_INFO['Password'] = input('password> ')
+    input1 = webdriver.find_element_by_name('Email')
+    input1.clear()
+    input1.send_keys(email)
     
-#   webdriver.Chrome(executable_path="D:\Projects\chromedriver.exe")
-    with requests.Session() as session:
-#   with webdriver.Chrome() as session:
+    input2 = webdriver.find_element_by_name('Password')
+    input2.clear()
+    input2.send_keys(password)
 
-        login_req = session.post('https://www.aladin.co.kr/login/wlogin.aspx', data=LOGIN_INFO)
+    input2.send_keys(Keys.RETURN)
 
-        status = login_req.status_code
-        is_ok = login_req.ok
+    # open the mycart
+    webdriver.get('http://www.aladin.co.kr/shop/wbasket.aspx')
 
-        if is_ok == False :
-            raise Exception('LOGIN FAILED! STATUS_CODE =' + status)
+    # click 'more' button
+    more_button = webdriver.find_element_by_class_name('button_navy')
+    
+    while more_button.is_displayed() :  
+        more = webdriver.find_element_by_class_name('button_middle_white_more')
+        more.click()
+        time.sleep(3) # wait for reload cart
 
-        
-        basket = session.get('http://www.aladin.co.kr/shop/wbasket.aspx')
-        soup = bs(basket.text, 'html.parser')        
+    # parse books
+    book_list = webdriver.find_elements_by_xpath('//*[starts-with(@id,"CartTr_")]/td[2]/a[1]')
 
-        book_list = soup.select('#ShopCode_Basket_0 a[style="color:#386DA1;"]')
+#    for i in book_list :
+#        print(i.text)
 
-        for i in book_list :
-            print(i.text)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+       result = {executor.submit(search_thread, book, webdriver): book for book in book_list}
+       
+    webdriver.close()
 
-#        with concurrent.futures.ThreadPoolExecutor() as executor:
-#            result = {executor.submit(search_process, book, session): book for book in book_list}
 
 if __name__ == '__main__':
     main()
